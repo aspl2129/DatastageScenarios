@@ -1,0 +1,136 @@
+A detailed breakdown of this adding header and trailer in an input .txt file, starting with a block diagram and step-by-step implementation.  
+
+---
+
+# ETL Job Design: Using Two Output Links
+### Block Diagram
+
++------------------+
+|  Sequential File |
+|  (Source: emp.txt) |
++------------------+
+         |
+         v
++------------------+
+| Transformer Stage |
++------------------+
+  |          |
+  |          |
+  v          v
++---------------+   +---------------+
+|  Output Link 1 |   |  Output Link 2 |
+|  (Header+Data) |   |   (Trailer)    |
++---------------+   +---------------+
+         |
+         v
++------------------+
+|  Sequential File |
+| (Target: emp_output.txt) |
++------------------+
+
+---
+
+# Step-by-Step Logic
+### Step 1: Read the Source File (emp.txt)
+- The input file (emp.txt) contains only employee records without a header or trailer.
+- Example content:
+  
+  John Doe
+  Jane Smith
+  David Lee
+  Emily Brown
+  Michael Clark
+  Sarah Jones
+  James Wilson
+  Christopher Young
+  Daniel White
+  
+
+---
+
+### Step 2: Use a Transformer Stage
+- Create three Stage Variables to handle header, counter, and trailer.
+- Use Two Output Links:
+  - Output Link 1 → Writes Header + Data
+  - Output Link 2 → Writes Trailer
+
+#### Define Stage Variables
+
+Stage Variable: svCounter
+Data Type: Integer
+Initial Value: 0
+Derivation: svCounter + 1
+
+Stage Variable: svHeader
+Data Type: Varchar(100)
+Initial Value: ""
+Derivation: IF @INROWNUM = 1 THEN 'HEADER|' : CurrentTimestamp() ELSE ''
+
+Stage Variable: svTrailer
+Data Type: Varchar(100)
+Initial Value: ""
+Derivation: 'TRAILER|' : svCounter
+
+Stage Variable: svFirstrow
+Data Type: Varchar(100)
+Initial Value: ""
+Derivation: IF @INROWNUM = 1 THEN LnkEmp.EmployeeName ELSE ''
+
+---
+
+### Step 3: Configure Output Link 1 (Header + Data)
+#### Constraint:
+@INROWNUM = 1 OR NOT ISNULL(LnkEmp.EmployeeName)
+
+#### Derivation:
+IF @INROWNUM = 1 THEN svHeader : CHAR(10) : LnkEmp.EmployeeName 
+ELSE LnkEmp.EmployeeName
+
+-Ensures header is written first.  
+-Ensures all employee records are included.
+
+---
+
+### Step 4: Configure Output Link 2 (Trailer)
+#### Constraint:
+LastRow()
+
+✔ Ensures the trailer is only written once at the end.
+
+#### Derivation:
+svTrailer
+
+✔ Ensures the trailer contains the correct count.  
+
+---
+
+### Step 5: Write to Target File (emp_output.txt)
+- Output Link 1 writes to the main target file (emp_output.txt).
+- Output Link 2 appends the trailer to the same file.
+
+---
+
+### Expected Final Output (emp_output.txt)
+
+HEADER|2025-02-25 09:30:32
+John Doe
+Jane Smith
+David Lee
+Emily Brown
+Michael Clark
+Sarah Jones
+James Wilson
+Christopher Young
+Daniel White
+TRAILER|9
+
+
+---
+
+# Why This Approach Works
+✔ Ensures Header is written at the top.  
+✔ All employee records are included.  
+✔ Trailer is written only once at the bottom with the correct count.  
+✔ Simple, efficient, and does not require extra processing stages.  
+
+---
